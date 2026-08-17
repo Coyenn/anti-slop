@@ -49,12 +49,20 @@ Every rule is deny-by-default. Disable one with `--allow RULE`.
 - `no_any_bag` — rejects `dyn Any` / `Box<dyn Any>` / `Arc<dyn Any>` / `Rc<dyn Any>` as a param, return, field, or alias.
 - `no_value_soup` — rejects `serde_json::Value`, `toml::Value`, and `serde_yaml::Value` as a domain type.
 - `no_untyped_map` — rejects `HashMap` / `BTreeMap` / `IndexMap` whose key is `String`/`str` and whose value is `Value` or `dyn Any`.
-- `no_discarded_error` — rejects `.ok()`, `.unwrap_or_else(...)`, and `.unwrap_or_default()`. Also hits `Option`; that is intentional.
+- `no_discarded_error` — rejects `.ok()`, `.unwrap_or_else(...)`, `.unwrap_or_default()`, `.map_or(...)`, `.map_or_else(...)`, `.get_or_insert(...)`, and `.get_or_insert_with(...)`. Also hits `Option`; that is intentional. Does not flag `ok_or` / `ok_or_else`.
 - `no_automock` — rejects `#[automock]`, `mockall::mock!`, and `mock!`.
 - `no_dead_guard` — rejects same-ident `is_ok()` / `is_some()` then `.unwrap()` / `.expect()` / `.unwrap_unchecked()` in that branch. Evidence already known. Inspired by [AndreyMashukov/rust-lint](https://github.com/AndreyMashukov/rust-lint).
 - `no_json_roundtrip` — rejects `serde_json::from_value(serde_json::to_value(...))` and the same laundering via a local binding.
 - `no_error_swallow` — rejects an `Err(_)` match arm that is empty, `()`, or only `let _ =`. Evidence-shaped form of [styrene-lab/lipstyk](https://github.com/styrene-lab/lipstyk) error swallowing.
 - `no_empty_safety` — rejects a `SAFETY:` comment whose body is empty or only generic words.
+- `no_json_index` — rejects `Value[i]` / `val[0]["k"]` indexing. serde_json `Index` returns `Null` when missing.
+- `no_type_alias_bag` — rejects a `type` alias whose target is `Value`, `dyn Any`, or a string-keyed untyped map.
+- `no_boxed_error` — rejects `Box<dyn Error>`, `anyhow::Error`, and `eyre::Report` as a domain type.
+- `no_stringly_error` — rejects `Result<T, String>` / `str` / `Cow<str>` as a domain type.
+- `no_typeid_branch` — rejects `TypeId::of`, `type_name`, `type_name_of_val`, and `downcast` / `downcast_ref` / `downcast_mut`.
+- `no_type_only_assert` — rejects `assert!(x.is_ok())` (and `is_err` / `is_some` / `is_none` / `is_empty`), including a leading `!`.
+- `no_widen_then_narrow` — rejects numeric `as` widen-then-narrow chains and `(x as T).try_into().unwrap()`.
+- `no_ad_hoc_env` — rejects `std::env::var` / `var_os` / `vars` / `vars_os` outside a `config` or `settings` module.
 
 ## Violation examples
 
@@ -90,6 +98,7 @@ fn take(map: HashMap<String, serde_json::Value>) {}
 ```rust
 let n = result.ok();
 let n = result.unwrap_or_default();
+let n = result.map_or(0, |v| v);
 ```
 
 ### `no_automock`
@@ -129,6 +138,57 @@ match result {
 ```rust
 // SAFETY: trust me
 let n = x as _;
+```
+
+### `no_json_index`
+
+```rust
+let _ = serde_json::Value[0]["k"];
+```
+
+### `no_type_alias_bag`
+
+```rust
+type Soup = serde_json::Value;
+```
+
+### `no_boxed_error`
+
+```rust
+fn load() -> Result<u32, Box<dyn std::error::Error>> {}
+```
+
+### `no_stringly_error`
+
+```rust
+fn load() -> Result<u32, String> {}
+```
+
+### `no_typeid_branch`
+
+```rust
+let id = std::any::TypeId::of::<u32>();
+let n = x.downcast_ref::<u32>();
+```
+
+### `no_type_only_assert`
+
+```rust
+assert!(x.is_ok());
+assert!(!y.is_some());
+```
+
+### `no_widen_then_narrow`
+
+```rust
+let n = x as u32 as u8;
+let n: u32 = (x as u64).try_into().unwrap();
+```
+
+### `no_ad_hoc_env`
+
+```rust
+let port = std::env::var("PORT");
 ```
 
 ## SAFETY escape

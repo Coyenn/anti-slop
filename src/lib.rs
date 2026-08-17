@@ -3,6 +3,7 @@
 //! Prefer a named owner / domain type, parse once at the I/O boundary, and
 //! keep evidence. This is not an AI-comment scanner.
 
+mod config;
 mod find;
 mod report;
 mod rules;

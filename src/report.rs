@@ -20,7 +20,7 @@ pub fn color_enabled(mode: ColorMode) -> bool {
         ColorMode::Never => false,
         ColorMode::Auto => {
             use std::io::IsTerminal;
-            std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none()
+            std::io::stdout().is_terminal() && !crate::config::ColorSettings::from_env().no_color
         }
     }
 }

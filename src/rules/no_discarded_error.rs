@@ -22,11 +22,19 @@ struct Discard<'a> {
 impl Visit<'_> for Discard<'_> {
     fn visit_expr_method_call(&mut self, node: &ExprMethodCall) {
         let name = node.method.to_string();
-        if matches!(name.as_str(), "ok" | "unwrap_or_else" | "unwrap_or_default") {
+        if matches!(
+            name.as_str(),
+            "ok" | "unwrap_or_else"
+                | "unwrap_or_default"
+                | "map_or"
+                | "map_or_else"
+                | "get_or_insert"
+                | "get_or_insert_with"
+        ) {
             self.findings.push(finding(
                 "no_discarded_error",
                 "This call discards Result/Option evidence.",
-                "Propagate the error or name the fallback and why it is sound. This rule also flags Option.",
+                "Propagate the error or name the fallback and why it is sound. This rule also flags Option, including map_or and get_or_insert.",
                 self.path,
                 node.method.span(),
             ));

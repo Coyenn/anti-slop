@@ -1,13 +1,21 @@
+mod no_ad_hoc_env;
 mod no_any_bag;
 mod no_automock;
+mod no_boxed_error;
 mod no_dead_guard;
 mod no_discarded_error;
 mod no_empty_safety;
 mod no_erasure_cast;
 mod no_error_swallow;
+mod no_json_index;
 mod no_json_roundtrip;
+mod no_stringly_error;
+mod no_type_alias_bag;
+mod no_type_only_assert;
+mod no_typeid_branch;
 mod no_untyped_map;
 mod no_value_soup;
+mod no_widen_then_narrow;
 
 use std::path::Path;
 
@@ -37,6 +45,14 @@ pub(crate) fn lint_rule(
         "no_json_roundtrip" => no_json_roundtrip::lint_file(file, src, path),
         "no_error_swallow" => no_error_swallow::lint_file(file, src, path),
         "no_empty_safety" => no_empty_safety::lint_file(file, src, path, comments),
+        "no_json_index" => no_json_index::lint_file(file, src, path),
+        "no_type_alias_bag" => no_type_alias_bag::lint_file(file, src, path),
+        "no_boxed_error" => no_boxed_error::lint_file(file, src, path),
+        "no_stringly_error" => no_stringly_error::lint_file(file, src, path),
+        "no_typeid_branch" => no_typeid_branch::lint_file(file, src, path),
+        "no_type_only_assert" => no_type_only_assert::lint_file(file, src, path),
+        "no_widen_then_narrow" => no_widen_then_narrow::lint_file(file, src, path),
+        "no_ad_hoc_env" => no_ad_hoc_env::lint_file(file, src, path),
         _ => Vec::new(),
     }
 }

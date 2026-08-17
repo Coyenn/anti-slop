@@ -18,6 +18,14 @@ pub const RULES: &[&str] = &[
     "no_json_roundtrip",
     "no_error_swallow",
     "no_empty_safety",
+    "no_json_index",
+    "no_type_alias_bag",
+    "no_boxed_error",
+    "no_stringly_error",
+    "no_typeid_branch",
+    "no_type_only_assert",
+    "no_widen_then_narrow",
+    "no_ad_hoc_env",
 ];
 
 /// Lint configuration. Every rule is denied (enabled) by default.

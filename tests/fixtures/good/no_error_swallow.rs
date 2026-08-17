@@ -1,11 +1,11 @@
-fn handle(r: Result<i32, &'static str>) -> Result<i32, &'static str> {
+fn handle(r: Result<i32, AppError>) -> Result<i32, AppError> {
     match r {
         Ok(v) => Ok(v),
         Err(e) => Err(e),
     }
 }
 
-fn named(r: Result<i32, &'static str>) {
+fn named(r: Result<i32, AppError>) {
     match r {
         Ok(_) => {}
         Err(e) => {
@@ -13,3 +13,5 @@ fn named(r: Result<i32, &'static str>) {
         }
     }
 }
+
+struct AppError;
