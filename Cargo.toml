@@ -1,0 +1,39 @@
+[package]
+name = "anti-slop"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+description = "Opinionated lints that reject low-evidence Rust patterns."
+license = "MIT"
+repository = "https://github.com/Coyenn/anti-slop"
+homepage = "https://github.com/Coyenn/anti-slop"
+documentation = "https://github.com/Coyenn/anti-slop"
+authors = ["Tim Ritter"]
+keywords = ["lint", "clippy", "dylint", "oxlint", "evidence"]
+categories = ["development-tools", "development-tools::cargo-plugins"]
+readme = "README.md"
+include = [
+    "src/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+    "rust-toolchain.toml",
+    "rustfmt.toml",
+]
+
+[lib]
+name = "anti_slop"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cargo-anti-slop"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syn = { version = "2", features = ["full", "extra-traits", "visit"] }
+walkdir = "2"
