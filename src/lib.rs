@@ -4,12 +4,14 @@
 //! keep evidence. This is not an AI-comment scanner.
 
 mod find;
+mod report;
 mod rules;
 mod walk;
 
 use std::path::Path;
 
 pub use find::{Config, Finding, RULES};
+pub use report::{color_enabled, render_text, ColorMode};
 
 /// Lint a file or a directory of `.rs` files.
 pub fn lint_path(path: &Path, config: &Config) -> anyhow::Result<Vec<Finding>> {

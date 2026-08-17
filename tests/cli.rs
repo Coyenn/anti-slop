@@ -14,23 +14,50 @@ fn bad(rule: &str) -> PathBuf {
 #[test]
 fn rustc_like_text_and_exit_one() {
     let out = Command::new(exe())
+        .arg("--color")
+        .arg("never")
         .arg(bad("no_erasure_cast"))
         .output()
         .expect("run cargo-anti-slop");
     assert_eq!(out.status.code(), Some(1));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
-        stdout.contains("error: anti-slop/no_erasure_cast:"),
+        stdout.contains("error[anti_slop::no_erasure_cast]:"),
         "{stdout}"
     );
-    assert!(stdout.contains("--> "), "{stdout}");
-    assert!(stdout.contains("help:"), "{stdout}");
+    assert!(stdout.contains("  --> "), "{stdout}");
+    assert!(stdout.contains('|'), "{stdout}");
+    assert!(stdout.contains('^'), "{stdout}");
+    assert!(stdout.contains("= help:"), "{stdout}");
+    assert!(
+        stdout.contains("= note: `#[deny(anti_slop::no_erasure_cast)]`"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("aborting due to"), "{stdout}");
+    assert!(
+        !stdout.contains('\u{1b}'),
+        "piped --color never must be plain: {stdout:?}"
+    );
+}
+
+#[test]
+fn color_always_paints() {
+    let out = Command::new(exe())
+        .arg("--color")
+        .arg("always")
+        .arg(bad("no_erasure_cast"))
+        .output()
+        .expect("run cargo-anti-slop");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("\u{1b}["), "{stdout:?}");
 }
 
 #[test]
 fn strips_cargo_plugin_arg() {
     let out = Command::new(exe())
         .arg("anti-slop")
+        .arg("--color")
+        .arg("never")
         .arg(bad("no_erasure_cast"))
         .output()
         .expect("run cargo-anti-slop");
@@ -50,7 +77,10 @@ fn json_format() {
     assert_eq!(out.status.code(), Some(1));
     let stdout = String::from_utf8_lossy(&out.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect(&stdout);
-    assert!(parsed.as_array().is_some_and(|a| !a.is_empty()));
+    let first = &parsed.as_array().expect("array")[0];
+    assert!(first.get("rule").is_some());
+    assert!(first.get("end_line").is_some());
+    assert!(first.get("end_column").is_some());
 }
 
 #[test]

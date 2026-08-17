@@ -62,10 +62,19 @@ pub struct Finding {
     pub file: String,
     pub line: usize,
     pub column: usize,
+    /// 1-based, exclusive when on the same line as `line`.
+    pub end_line: usize,
+    pub end_column: usize,
 }
 
 pub(crate) fn finding(rule: &str, message: &str, help: &str, path: &Path, span: Span) -> Finding {
     let start = span.start();
+    let end = span.end();
+    let end_line = if end.line == 0 { start.line } else { end.line };
+    let mut end_column = end.column + 1;
+    if end_line == start.line && end_column <= start.column + 1 {
+        end_column = start.column + 2;
+    }
     Finding {
         rule: rule.to_string(),
         message: message.to_string(),
@@ -73,24 +82,8 @@ pub(crate) fn finding(rule: &str, message: &str, help: &str, path: &Path, span: 
         file: path.display().to_string(),
         line: start.line,
         column: start.column + 1,
-    }
-}
-
-pub(crate) fn finding_at(
-    rule: &str,
-    message: &str,
-    help: &str,
-    path: &Path,
-    line: usize,
-    column: usize,
-) -> Finding {
-    Finding {
-        rule: rule.to_string(),
-        message: message.to_string(),
-        help: help.to_string(),
-        file: path.display().to_string(),
-        line,
-        column,
+        end_line,
+        end_column,
     }
 }
 

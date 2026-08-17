@@ -1,8 +1,9 @@
 use std::env;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use anti_slop::{lint_path, Config, Finding, RULES};
+use anti_slop::{color_enabled, lint_path, render_text, ColorMode, Config, RULES};
 use clap::{Parser, ValueEnum};
 
 #[derive(Parser, Debug)]
@@ -28,6 +29,10 @@ struct Cli {
     #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
     format: OutputFormat,
 
+    /// Color diagnostics, like rustc.
+    #[arg(long, value_enum, default_value_t = ColorArg::Auto)]
+    color: ColorArg,
+
     /// Extra path glob or directory name to skip (default: target, .git).
     #[arg(long, value_name = "GLOB")]
     exclude: Vec<String>,
@@ -37,6 +42,23 @@ struct Cli {
 enum OutputFormat {
     Text,
     Json,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum ColorArg {
+    Auto,
+    Always,
+    Never,
+}
+
+impl From<ColorArg> for ColorMode {
+    fn from(value: ColorArg) -> Self {
+        match value {
+            ColorArg::Auto => ColorMode::Auto,
+            ColorArg::Always => ColorMode::Always,
+            ColorArg::Never => ColorMode::Never,
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -88,7 +110,12 @@ fn run() -> anyhow::Result<ExitCode> {
     });
 
     match cli.format {
-        OutputFormat::Text => print_text(&findings),
+        OutputFormat::Text => {
+            let color = color_enabled(cli.color.into());
+            let text = render_text(&findings, color);
+            let mut out = std::io::stdout().lock();
+            out.write_all(text.as_bytes())?;
+        }
         OutputFormat::Json => {
             println!("{}", serde_json::to_string_pretty(&findings)?);
         }
@@ -103,22 +130,8 @@ fn run() -> anyhow::Result<ExitCode> {
 
 /// Cargo plugin convention: `cargo anti-slop` invokes `cargo-anti-slop anti-slop ...`.
 fn plugin_args(mut args: Vec<String>) -> Vec<String> {
-    // `cargo anti-slop` invokes `cargo-anti-slop anti-slop ...`.
     if args.get(1).map(String::as_str) == Some("anti-slop") {
         args.remove(1);
     }
     args
-}
-
-fn print_text(findings: &[Finding]) {
-    for (i, f) in findings.iter().enumerate() {
-        if i > 0 {
-            println!();
-        }
-        println!("--> {}:{}:{}", f.file, f.line, f.column);
-        println!("error: anti-slop/{}: {}", f.rule, f.message);
-        if !f.help.is_empty() {
-            println!("help: {}", f.help);
-        }
-    }
 }

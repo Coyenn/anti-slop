@@ -22,6 +22,25 @@ cargo anti-slop --allow no_discarded_error --format json
 
 Exit status is `1` if any finding is reported.
 
+`--color always|auto|never` matches rustc. Piped output is plain unless you pass `--color always`. `NO_COLOR` disables color in `auto`.
+
+## Output
+
+Diagnostics use rustc / Clippy's human format: lint id, file location, source snippet, caret, help, and a deny-by-default note.
+
+```text
+error[anti_slop::no_erasure_cast]: This `as _` cast discards type evidence.
+  --> src/lib.rs:12:7
+   |
+12 |     x as _
+   |       ^^^^
+   |
+   = help: Name the target type so the conversion stays visible.
+   = note: `#[deny(anti_slop::no_erasure_cast)]` on by default
+
+error: aborting due to 1 previous error
+```
+
 ## Rules
 
 Every rule is deny-by-default. Disable one with `--allow RULE`.

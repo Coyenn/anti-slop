@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{ExprCast, File, Type};
 
@@ -27,7 +28,7 @@ impl Visit<'_> for Erasure<'_> {
                 "This `as _` cast discards type evidence.",
                 "Name the target type so the conversion stays visible.",
                 self.path,
-                node.as_token.span,
+                node.span(),
             ));
         }
         if let syn::Expr::Cast(inner) = &*node.expr {
@@ -37,7 +38,7 @@ impl Visit<'_> for Erasure<'_> {
                     "This cast chain discards type evidence.",
                     "Keep a named owner type, or convert through a single documented pointer type.",
                     self.path,
-                    node.as_token.span,
+                    node.span(),
                 ));
             }
         }
