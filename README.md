@@ -60,7 +60,7 @@ Every rule is deny-by-default. Disable one with `--allow RULE`.
 - `no_boxed_error` — rejects `Box<dyn Error>`, `anyhow::Error`, and `eyre::Report` as a domain type.
 - `no_stringly_error` — rejects `Result<T, String>` / `str` / `Cow<str>` as a domain type.
 - `no_typeid_branch` — rejects `TypeId::of`, `type_name`, `type_name_of_val`, and `downcast` / `downcast_ref` / `downcast_mut`.
-- `no_type_only_assert` — rejects `assert!(x.is_ok())` (and `is_err` / `is_some` / `is_none` / `is_empty`), including a leading `!`.
+- `no_type_only_assert` — rejects `assert!(x.is_ok())` (and `is_err` / `is_some` / `is_none` / `is_empty`), including a leading `!`. Skips `#[test]`, `#[cfg(test)]`, and integration-test files.
 - `no_widen_then_narrow` — rejects numeric `as` widen-then-narrow chains and `(x as T).try_into().unwrap()`.
 - `no_ad_hoc_env` — rejects `std::env::var` / `var_os` / `vars` / `vars_os` outside a `config` or `settings` module.
 
