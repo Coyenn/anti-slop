@@ -26,6 +26,7 @@ pub const RULES: &[&str] = &[
     "no_type_only_assert",
     "no_widen_then_narrow",
     "no_ad_hoc_env",
+    "no_over_1k",
 ];
 
 /// Lint configuration. Every rule is denied (enabled) by default.
@@ -122,7 +123,9 @@ pub(crate) fn lint_source(src: &str, path: &Path, config: &Config) -> anyhow::Re
         findings.extend(rules::lint_rule(rule, &file, src, path, &comments));
     }
     findings.retain(|f| {
-        f.rule == "no_empty_safety" || !has_safety_escape(&comments, src, f.line, f.column)
+        f.rule == "no_empty_safety"
+            || f.rule == "no_over_1k"
+            || !has_safety_escape(&comments, src, f.line, f.column)
     });
     Ok(findings)
 }

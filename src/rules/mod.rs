@@ -9,6 +9,7 @@ mod no_erasure_cast;
 mod no_error_swallow;
 mod no_json_index;
 mod no_json_roundtrip;
+mod no_over_1k;
 mod no_stringly_error;
 mod no_type_alias_bag;
 mod no_type_only_assert;
@@ -53,6 +54,7 @@ pub(crate) fn lint_rule(
         "no_type_only_assert" => no_type_only_assert::lint_file(file, src, path),
         "no_widen_then_narrow" => no_widen_then_narrow::lint_file(file, src, path),
         "no_ad_hoc_env" => no_ad_hoc_env::lint_file(file, src, path),
+        "no_over_1k" => no_over_1k::lint_file(file, src, path),
         _ => Vec::new(),
     }
 }

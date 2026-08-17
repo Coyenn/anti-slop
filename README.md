@@ -63,6 +63,7 @@ Every rule is deny-by-default. Disable one with `--allow RULE`.
 - `no_type_only_assert` — rejects `assert!(x.is_ok())` (and `is_err` / `is_some` / `is_none` / `is_empty`), including a leading `!`. Skips `#[test]`, `#[cfg(test)]`, and integration-test files.
 - `no_widen_then_narrow` — rejects numeric `as` widen-then-narrow chains and `(x as T).try_into().unwrap()`.
 - `no_ad_hoc_env` — rejects `std::env::var` / `var_os` / `vars` / `vars_os` outside a `config` or `settings` module.
+- `no_over_1k` — rejects a `.rs` file over 1000 lines. From [thermo-nuclear-code-quality-review](https://github.com/cursor/plugins/blob/main/cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md).
 
 ## Violation examples
 
@@ -190,6 +191,10 @@ let n: u32 = (x as u64).try_into().unwrap();
 ```rust
 let port = std::env::var("PORT");
 ```
+
+### `no_over_1k`
+
+A `.rs` file whose line count is greater than 1000.
 
 ## SAFETY escape
 

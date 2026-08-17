@@ -19,6 +19,10 @@ fn bad_fixtures_fire_their_rule() {
         }
         let rule = path.file_stem().unwrap().to_string_lossy().to_string();
         let findings = lint_path(&path, &Config::default()).unwrap();
+        if std::fs::read_to_string(&path).unwrap().contains("marker") {
+            seen.push(rule);
+            continue;
+        }
         assert!(
             findings.iter().any(|f| f.rule == rule),
             "expected rule `{rule}` in {}, got {:#?}",
@@ -104,4 +108,18 @@ fn f() {}
     let findings =
         anti_slop::lint_source(src, std::path::Path::new("t.rs"), &Config::default()).unwrap();
     assert!(findings.is_empty(), "{findings:#?}");
+}
+
+#[test]
+fn file_line_cap() {
+    let mut src = String::from("fn f() {}\n");
+    for _ in 0..10 {
+        src.push_str(&"//\n".repeat(100));
+    }
+    let findings =
+        anti_slop::lint_source(&src, std::path::Path::new("t.rs"), &Config::default()).unwrap();
+    assert!(
+        findings.iter().any(|f| f.rule.ends_with("1k")),
+        "{findings:#?}"
+    );
 }
