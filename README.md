@@ -2,7 +2,7 @@
 
 Opinionated lints that reject low-evidence and low-signal Rust patterns.
 
-Prefer a **named owner / domain type**, parse once at the **I/O boundary**, and keep **evidence**. This crate is a port of [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop)'s evidence thesis to Rust. It is not an AI-comment scanner.
+Prefer a **named owner / domain type**, parse once at the **I/O boundary**, and keep **evidence**. This crate is a port of [dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop)'s evidence thesis to Rust, plus deterministic **language-slop** checks on comments and docs (AI-writing tells, not authorship claims).
 
 This project is meant to be opinionated. Read the rules, change them, `--allow` the ones that do not match your team. The bundled defaults are a thesis, not a constitution.
 
@@ -18,9 +18,12 @@ The binary is named `cargo-anti-slop`, so Cargo's plugin convention works:
 cargo anti-slop
 cargo anti-slop src/
 cargo anti-slop --allow no_discarded_error --format json
+cargo anti-slop --lint-strings src/
 ```
 
 Exit status is `1` if any finding is reported.
+
+By default, language rules lint **comments and doc comments only** (`//`, `///`, `//!`, `/* */`). Pass `--lint-strings` (or set `Config.lint_strings = true` in the library) to also scan string literals. User-facing copy in strings is your choice; the default keeps strings off.
 
 `--color always|auto|never` matches rustc. Piped output is plain unless you pass `--color always`. `NO_COLOR` disables color in `auto`.
 
@@ -64,6 +67,16 @@ Every rule is deny-by-default. Disable one with `--allow RULE`.
 - `no_widen_then_narrow` — rejects numeric `as` widen-then-narrow chains and `(x as T).try_into().unwrap()`.
 - `no_ad_hoc_env` — rejects `std::env::var` / `var_os` / `vars` / `vars_os` outside a `config` or `settings` module.
 - `no_over_1k` — rejects a `.rs` file over 1000 lines. From [thermo-nuclear-code-quality-review](https://github.com/cursor/plugins/blob/main/cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md).
+
+### Language slop (comments and docs by default)
+
+Deterministic regex-style checks inspired by [stopslop](https://github.com/mgiovani/stopslop) and [ai-slop-detect](https://github.com/antydizajn/ai-slop-detect). No LLM, no prose-density scorer. Each finding includes a concrete `help:` rewrite hint.
+
+- `no_emdash` — U+2014, mid-prose U+2013, or spaced `--` in comments. Exempt numeric ranges (`2020–2024`, `1.0–2.0`) and attribution-only lines (`— MIT`). Help: rewrite as two sentences, a comma, or parentheses.
+- `no_smart_quotes` — curly quotes/apostrophes (`‘’“”`) in comments. Help: use ASCII `'` / `"`.
+- `no_chat_preamble` — comment starts with assistant residue (`Certainly`, `Of course`, `Great question`, `I'd be happy to`, `Here's the updated`, `Let me know if`, …). Help: delete the preamble; keep any technical note.
+- `no_elision_comment` — `rest of the code unchanged`, `... existing code ...`, `insert code here`. Help: delete; the edit should be complete.
+- `no_fence_comment` — a comment that is only a markdown ` ``` ` fence. Help: delete.
 
 ## Violation examples
 
@@ -196,6 +209,36 @@ let port = std::env::var("PORT");
 
 A `.rs` file whose line count is greater than 1000.
 
+### `no_emdash`
+
+```rust
+// parse once — keep evidence
+```
+
+### `no_smart_quotes`
+
+```rust
+// say “hello”
+```
+
+### `no_chat_preamble`
+
+```rust
+// Certainly! Here's the updated handler.
+```
+
+### `no_elision_comment`
+
+```rust
+// ... rest of the code unchanged ...
+```
+
+### `no_fence_comment`
+
+```rust
+// ```rust
+```
+
 ## SAFETY escape
 
 The only comment escape is `SAFETY:` (case-sensitive, word-boundary, optional space, colon) on the line immediately before the offending construct, stating an invariant. Empty or generic text (`safe`, `trust me`, `it's fine`, `this is ok`, `okay`, `lints`) does not count.
@@ -207,14 +250,25 @@ let id = raw as UserId;
 
 A block comment immediately before the span works the same way.
 
+## LANGUAGE escape
+
+Put `LANGUAGE:` (case-sensitive, word-boundary, optional space, colon) in a comment to keep intentional prose there. Same spirit as `SAFETY:`, but for language-slop lints on that comment (or string literal when `--lint-strings` is on).
+
+```rust
+// LANGUAGE: keep — stylistic dash in this attribution note.
+```
+
+Disable a rule project-wide with `--allow no_emdash` (or any other rule name).
+
 ## Companion Clippy
 
 Turn on Clippy's `undocumented_unsafe_blocks` and nothing else from this thesis. anti-slop is about evidence in safe Rust; Clippy already covers `unsafe` blocks.
 
 ## What this is not
 
-- Not [antislop](https://github.com/antislop) / stopslop comment scanners. No restating-comment, no generic-naming, no TODO lints.
+- Not a full [stopslop](https://github.com/mgiovani/stopslop) port. No markdown-density suite, no document-wide “delve / tapestry / leverage” vocabulary gate, no narrative-comment-restates-code heuristic (too fuzzy at this precision bar).
 - Not [lipstyk](https://github.com/styrene-lab/lipstyk) style-slop. No clone-overuse, no unwrap-used-as-panic, no Shape-in-names.
+- Not an LLM classifier or authorship detector. Language rules are high-confidence formatting and phrasing artifacts only.
 - Not dylint, rustc_private, or clippy_utils. Stable Rust only, so it can publish to crates.io.
 
 The rust-lint dead-guard / silent-fallback idea and the lipstyk error-swallowing idea are used only in their evidence-shaped form: you already knew the variant, or you threw the `Err` away.

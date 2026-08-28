@@ -17,6 +17,7 @@ mod no_typeid_branch;
 mod no_untyped_map;
 mod no_value_soup;
 mod no_widen_then_narrow;
+mod language;
 
 use std::path::Path;
 
@@ -26,7 +27,7 @@ use syn::{
     ItemType, ItemUnion, PathArguments, ReturnType, TraitItemFn, Type, TypeParamBound,
 };
 
-use crate::find::{Comment, Finding};
+use crate::find::{Comment, Finding, TextSurface};
 
 pub(crate) fn lint_rule(
     rule: &str,
@@ -34,6 +35,7 @@ pub(crate) fn lint_rule(
     src: &str,
     path: &Path,
     comments: &[Comment],
+    strings: &[TextSurface],
 ) -> Vec<Finding> {
     match rule {
         "no_erasure_cast" => no_erasure_cast::lint_file(file, src, path),
@@ -55,6 +57,8 @@ pub(crate) fn lint_rule(
         "no_widen_then_narrow" => no_widen_then_narrow::lint_file(file, src, path),
         "no_ad_hoc_env" => no_ad_hoc_env::lint_file(file, src, path),
         "no_over_1k" => no_over_1k::lint_file(file, src, path),
+        "no_emdash" | "no_smart_quotes" | "no_chat_preamble" | "no_elision_comment"
+        | "no_fence_comment" => language::lint_file(file, src, path, comments, strings, rule),
         _ => Vec::new(),
     }
 }
@@ -171,7 +175,7 @@ pub(crate) fn is_untyped_map(ty: &Type) -> bool {
     is_stringish(types[0]) && (is_any_bag(value) || is_value_soup(value) || is_bare_value(value))
 }
 
-/// Walk param / return / field / alias types only — the domain-type positions.
+/// Walk param / return / field / alias types only, at the domain-type positions.
 pub(crate) fn visit_domain_types(file: &syn::File, on_type: impl FnMut(&Type)) {
     let mut v = DomainTypes { on_type };
     v.visit_file(file);

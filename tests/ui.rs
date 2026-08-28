@@ -107,7 +107,57 @@ fn f() {}
 ";
     let findings =
         anti_slop::lint_source(src, std::path::Path::new("t.rs"), &Config::default()).unwrap();
-    assert!(findings.is_empty(), "{findings:#?}");
+    assert!(
+        findings.iter().any(|f| f.rule == "no_emdash"),
+        "{findings:#?}"
+    );
+}
+
+#[test]
+fn language_escape_suppresses_emdash() {
+    let src = "// LANGUAGE: keep — stylistic dash in this note.
+fn f() {}
+";
+    let findings =
+        anti_slop::lint_source(src, std::path::Path::new("t.rs"), &Config::default()).unwrap();
+    assert!(
+        findings.iter().all(|f| f.rule != "no_emdash"),
+        "{findings:#?}"
+    );
+}
+
+#[test]
+fn strings_default_off() {
+    let src = r#"
+fn f() {
+    let _ = "Certainly! Here's the thing.";
+}
+"#;
+    let findings =
+        anti_slop::lint_source(src, std::path::Path::new("t.rs"), &Config::default()).unwrap();
+    assert!(
+        findings.iter().all(|f| f.rule != "no_chat_preamble"),
+        "{findings:#?}"
+    );
+}
+
+#[test]
+fn strings_opt_in() {
+    let src = r#"
+fn f() {
+    let _ = "Certainly! Here's the thing.";
+}
+"#;
+    let config = Config {
+        lint_strings: true,
+        ..Config::default()
+    };
+    let findings =
+        anti_slop::lint_source(src, std::path::Path::new("t.rs"), &config).unwrap();
+    assert!(
+        findings.iter().any(|f| f.rule == "no_chat_preamble"),
+        "{findings:#?}"
+    );
 }
 
 #[test]

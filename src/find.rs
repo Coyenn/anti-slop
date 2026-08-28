@@ -27,6 +27,11 @@ pub const RULES: &[&str] = &[
     "no_widen_then_narrow",
     "no_ad_hoc_env",
     "no_over_1k",
+    "no_emdash",
+    "no_smart_quotes",
+    "no_chat_preamble",
+    "no_elision_comment",
+    "no_fence_comment",
 ];
 
 /// Lint configuration. Every rule is denied (enabled) by default.
@@ -38,6 +43,8 @@ pub struct Config {
     pub deny: Vec<String>,
     /// Path globs or directory names to skip. `target` and `.git` are always skipped.
     pub exclude: Vec<String>,
+    /// When true, language rules also scan string literals. Default: comments and docs only.
+    pub lint_strings: bool,
 }
 
 impl Default for Config {
@@ -46,6 +53,7 @@ impl Default for Config {
             allow: Vec::new(),
             deny: Vec::new(),
             exclude: vec!["target".into(), ".git".into()],
+            lint_strings: false,
         }
     }
 }
@@ -104,6 +112,14 @@ pub(crate) struct Comment {
     pub end_line: usize,
     pub end_col: usize,
     pub body: String,
+    pub body_start_byte: usize,
+}
+
+/// A string literal surface for optional language linting.
+#[derive(Debug, Clone)]
+pub(crate) struct TextSurface {
+    pub body: String,
+    pub body_start_byte: usize,
 }
 
 pub(crate) fn lint_source(src: &str, path: &Path, config: &Config) -> anyhow::Result<Vec<Finding>> {
@@ -115,12 +131,24 @@ pub(crate) fn lint_source(src: &str, path: &Path, config: &Config) -> anyhow::Re
         )
     })?;
     let comments = scan_comments(src);
+    let strings = if config.lint_strings {
+        scan_string_literals(src)
+    } else {
+        Vec::new()
+    };
     let mut findings = Vec::new();
     for rule in RULES {
         if !config.is_enabled(rule) {
             continue;
         }
-        findings.extend(rules::lint_rule(rule, &file, src, path, &comments));
+        findings.extend(rules::lint_rule(
+            rule,
+            &file,
+            src,
+            path,
+            &comments,
+            &strings,
+        ));
     }
     findings.retain(|f| {
         f.rule == "no_empty_safety"
@@ -181,6 +209,53 @@ pub(crate) fn is_real_safety(comment: &Comment) -> bool {
         Some(body) => !is_generic_safety(body),
         None => false,
     }
+}
+
+/// `LANGUAGE:` (word-boundary, optional space, colon). Case-sensitive.
+pub(crate) fn language_escape(text: &str) -> bool {
+    language_body(text).is_some()
+}
+
+pub(crate) fn language_body(text: &str) -> Option<&str> {
+    for (i, _) in text.char_indices() {
+        if !text[i..].starts_with("LANGUAGE") {
+            continue;
+        }
+        let before_ok = match text[..i].chars().next_back() {
+            None => true,
+            Some(c) => !c.is_ascii_alphanumeric() && c != '_',
+        };
+        if !before_ok {
+            continue;
+        }
+        let after = i + "LANGUAGE".len();
+        let mut rest = &text[after..];
+        if rest.starts_with(' ') {
+            rest = &rest[1..];
+        }
+        if let Some(stripped) = rest.strip_prefix(':') {
+            return Some(stripped);
+        }
+    }
+    None
+}
+
+/// Map a byte offset in `src` to a 1-based `(line, column)`.
+pub(crate) fn pos_at_offset(src: &str, offset: usize) -> (usize, usize) {
+    let mut line = 1usize;
+    let mut col = 1usize;
+    for (i, ch) in src.char_indices() {
+        if i >= offset {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            col = 1;
+        } else {
+            col += 1;
+        }
+    }
+    (line, col.max(1))
 }
 
 fn is_ident_byte(b: u8) -> bool {
@@ -317,6 +392,7 @@ pub(crate) fn scan_comments(src: &str) -> Vec<Comment> {
                     end_line: line,
                     end_col: col,
                     body,
+                    body_start_byte: body_start,
                 });
             }
             b'/' if i + 1 < bytes.len() && bytes[i + 1] == b'*' => {
@@ -343,6 +419,7 @@ pub(crate) fn scan_comments(src: &str) -> Vec<Comment> {
                                 end_line: line,
                                 end_col: col,
                                 body,
+                                body_start_byte: body_start,
                             });
                             break;
                         }
@@ -357,6 +434,153 @@ pub(crate) fn scan_comments(src: &str) -> Vec<Comment> {
         }
     }
     out
+}
+
+/// Scan `"..."`, `'...'`, and `r#"..."#` literal contents (not raw identifiers).
+pub(crate) fn scan_string_literals(src: &str) -> Vec<TextSurface> {
+    let bytes = src.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    let mut line = 1usize;
+    let mut col = 1usize;
+
+    let bump = |i: &mut usize, line: &mut usize, col: &mut usize| {
+        if *i < bytes.len() && bytes[*i] == b'\n' {
+            *line += 1;
+            *col = 1;
+        } else {
+            *col += 1;
+        }
+        *i += 1;
+    };
+
+    while i < bytes.len() {
+        if is_raw_string_start(bytes, i) {
+            let start_i = i;
+            if bytes[i] == b'b' {
+                bump(&mut i, &mut line, &mut col);
+            }
+            bump(&mut i, &mut line, &mut col); // r
+            let mut hashes = 0usize;
+            while i < bytes.len() && bytes[i] == b'#' {
+                hashes += 1;
+                bump(&mut i, &mut line, &mut col);
+            }
+            if i < bytes.len() && bytes[i] == b'"' {
+                bump(&mut i, &mut line, &mut col);
+            }
+            let body_start = i;
+            while i < bytes.len() {
+                if bytes[i] == b'"' {
+                    let mut ok = true;
+                    for k in 0..hashes {
+                        if i + 1 + k >= bytes.len() || bytes[i + 1 + k] != b'#' {
+                            ok = false;
+                            break;
+                        }
+                    }
+                    if ok {
+                        out.push(TextSurface {
+                            body: src[body_start..i].to_string(),
+                            body_start_byte: body_start,
+                        });
+                        bump(&mut i, &mut line, &mut col);
+                        for _ in 0..hashes {
+                            bump(&mut i, &mut line, &mut col);
+                        }
+                        break;
+                    }
+                }
+                bump(&mut i, &mut line, &mut col);
+            }
+            let _ = start_i;
+            continue;
+        }
+        if bytes[i] == b'b' && i + 1 < bytes.len() && bytes[i + 1] == b'"' {
+            bump(&mut i, &mut line, &mut col);
+            push_string_body(src, bytes, &mut i, &mut line, &mut col, &mut out);
+            continue;
+        }
+        if bytes[i] == b'"' {
+            push_string_body(src, bytes, &mut i, &mut line, &mut col, &mut out);
+            continue;
+        }
+        if bytes[i] == b'b' && i + 1 < bytes.len() && bytes[i + 1] == b'\'' {
+            bump(&mut i, &mut line, &mut col);
+            skip_char(bytes, &mut i, &mut line, &mut col);
+            continue;
+        }
+        if bytes[i] == b'\'' {
+            let next = bytes.get(i + 1).copied();
+            let next2 = bytes.get(i + 2).copied();
+            if next == Some(b'\\') || (next.is_some() && next2 == Some(b'\'')) {
+                skip_char(bytes, &mut i, &mut line, &mut col);
+            } else {
+                bump(&mut i, &mut line, &mut col);
+            }
+            continue;
+        }
+        if bytes[i] == b'/' && i + 1 < bytes.len() && (bytes[i + 1] == b'/' || bytes[i + 1] == b'*') {
+            if bytes[i + 1] == b'/' {
+                bump(&mut i, &mut line, &mut col);
+                bump(&mut i, &mut line, &mut col);
+                while i < bytes.len() && bytes[i] != b'\n' {
+                    bump(&mut i, &mut line, &mut col);
+                }
+            } else {
+                bump(&mut i, &mut line, &mut col);
+                bump(&mut i, &mut line, &mut col);
+                let mut depth = 1u32;
+                while i + 1 < bytes.len() && depth > 0 {
+                    if bytes[i] == b'/' && bytes[i + 1] == b'*' {
+                        depth += 1;
+                        bump(&mut i, &mut line, &mut col);
+                        bump(&mut i, &mut line, &mut col);
+                    } else if bytes[i] == b'*' && bytes[i + 1] == b'/' {
+                        depth -= 1;
+                        bump(&mut i, &mut line, &mut col);
+                        bump(&mut i, &mut line, &mut col);
+                    } else {
+                        bump(&mut i, &mut line, &mut col);
+                    }
+                }
+            }
+            continue;
+        }
+        bump(&mut i, &mut line, &mut col);
+    }
+    out
+}
+
+fn push_string_body(
+    src: &str,
+    bytes: &[u8],
+    i: &mut usize,
+    line: &mut usize,
+    col: &mut usize,
+    out: &mut Vec<TextSurface>,
+) {
+    advance(bytes, i, line, col); // opening "
+    let body_start = *i;
+    while *i < bytes.len() {
+        match bytes[*i] {
+            b'\\' => {
+                advance(bytes, i, line, col);
+                if *i < bytes.len() {
+                    advance(bytes, i, line, col);
+                }
+            }
+            b'"' => {
+                out.push(TextSurface {
+                    body: src[body_start..*i].to_string(),
+                    body_start_byte: body_start,
+                });
+                advance(bytes, i, line, col);
+                return;
+            }
+            _ => advance(bytes, i, line, col),
+        }
+    }
 }
 
 fn is_raw_string_start(bytes: &[u8], i: usize) -> bool {
