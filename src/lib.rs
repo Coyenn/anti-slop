@@ -1,7 +1,4 @@
-//! Opinionated lints that reject low-evidence Rust patterns.
-//!
-//! Prefer a named owner / domain type, parse once at the I/O boundary, and
-//! keep evidence. This is not an AI-comment scanner.
+//! Opinionated lints that reject low-evidence Rust patterns and AI-language tells in comments.
 
 mod config;
 mod find;

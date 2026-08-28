@@ -36,6 +36,10 @@ struct Cli {
     /// Extra path glob or directory name to skip (default: target, .git).
     #[arg(long, value_name = "GLOB")]
     exclude: Vec<String>,
+
+    /// Also lint string literals for AI-language tells (default: comments and docs only).
+    #[arg(long)]
+    lint_strings: bool,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -93,6 +97,7 @@ fn run() -> anyhow::Result<ExitCode> {
             }
             ex
         },
+        lint_strings: cli.lint_strings,
     };
 
     let paths = if cli.paths.is_empty() {
