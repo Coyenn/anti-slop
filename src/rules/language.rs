@@ -24,6 +24,19 @@ const ELISION_PHRASES: &[&str] = &[
 
 const SMART_QUOTES: &[char] = &['\u{2018}', '\u{2019}', '\u{201c}', '\u{201d}'];
 
+struct LanguageLint<'a> {
+    rule: &'a str,
+    message: &'a str,
+    help: &'a str,
+    src: &'a str,
+    path: &'a Path,
+}
+
+struct ScanInput<'a> {
+    comments: &'a [Comment],
+    strings: &'a [TextSurface],
+}
+
 pub fn lint_emdash(
     src: &str,
     path: &Path,
@@ -31,13 +44,17 @@ pub fn lint_emdash(
     strings: &[TextSurface],
 ) -> Vec<Finding> {
     lint_surfaces(
-        "no_emdash",
-        "This text uses an em dash or mid-prose dash.",
-        "Rewrite as two sentences, a comma, or parentheses.",
-        src,
-        path,
-        comments,
-        strings,
+        LanguageLint {
+            rule: "no_emdash",
+            message: "This text uses an em dash or mid-prose dash.",
+            help: "Rewrite as two sentences, a comma, or parentheses.",
+            src,
+            path,
+        },
+        ScanInput {
+            comments,
+            strings,
+        },
         emdash_match,
     )
 }
@@ -49,13 +66,17 @@ pub fn lint_smart_quotes(
     strings: &[TextSurface],
 ) -> Vec<Finding> {
     lint_surfaces(
-        "no_smart_quotes",
-        "This text uses curly quotes or apostrophes.",
-        "Use ASCII `'` / `\"`.",
-        src,
-        path,
-        comments,
-        strings,
+        LanguageLint {
+            rule: "no_smart_quotes",
+            message: "This text uses curly quotes or apostrophes.",
+            help: "Use ASCII `'` / `\"`.",
+            src,
+            path,
+        },
+        ScanInput {
+            comments,
+            strings,
+        },
         smart_quote_match,
     )
 }
@@ -67,13 +88,17 @@ pub fn lint_chat_preamble(
     strings: &[TextSurface],
 ) -> Vec<Finding> {
     lint_surfaces(
-        "no_chat_preamble",
-        "This text starts with assistant-style preamble.",
-        "Delete the preamble; keep any actual technical note.",
-        src,
-        path,
-        comments,
-        strings,
+        LanguageLint {
+            rule: "no_chat_preamble",
+            message: "This text starts with assistant-style preamble.",
+            help: "Delete the preamble; keep any actual technical note.",
+            src,
+            path,
+        },
+        ScanInput {
+            comments,
+            strings,
+        },
         chat_preamble_match,
     )
 }
@@ -85,30 +110,37 @@ pub fn lint_elision_comment(
     strings: &[TextSurface],
 ) -> Vec<Finding> {
     lint_surfaces(
-        "no_elision_comment",
-        "This comment elides code instead of showing the full edit.",
-        "Delete; the edit should be complete.",
-        src,
-        path,
-        comments,
-        strings,
+        LanguageLint {
+            rule: "no_elision_comment",
+            message: "This comment elides code instead of showing the full edit.",
+            help: "Delete; the edit should be complete.",
+            src,
+            path,
+        },
+        ScanInput {
+            comments,
+            strings,
+        },
         elision_match,
     )
 }
 
 pub fn lint_fence_comment(src: &str, path: &Path, comments: &[Comment]) -> Vec<Finding> {
+    let lint = LanguageLint {
+        rule: "no_fence_comment",
+        message: "This comment is only a markdown code fence.",
+        help: "Delete.",
+        src,
+        path,
+    };
     let mut findings = Vec::new();
     for comment in comments {
         if language_escape(&comment.body) || !fence_match(&comment.body) {
             continue;
         }
-        findings.push(finding_for_comment(
-            "no_fence_comment",
-            "This comment is only a markdown code fence.",
-            "Delete.",
-            path,
-            src,
-            comment,
+        findings.push(finding_for_body(
+            &lint,
+            comment.body_start_byte,
             0,
             comment.body.len(),
         ));
@@ -136,86 +168,52 @@ pub fn lint_file(
 
 type SurfaceMatch = fn(&str) -> Option<(usize, usize)>;
 
-fn lint_surfaces(
-    rule: &str,
-    message: &str,
-    help: &str,
-    src: &str,
-    path: &Path,
-    comments: &[Comment],
-    strings: &[TextSurface],
-    matcher: SurfaceMatch,
-) -> Vec<Finding> {
+fn lint_surfaces(lint: LanguageLint, input: ScanInput, matcher: SurfaceMatch) -> Vec<Finding> {
     let mut findings = Vec::new();
-    for comment in comments {
+    for comment in input.comments {
         if language_escape(&comment.body) {
             continue;
         }
         if let Some((start, end)) = matcher(&comment.body) {
-            findings.push(finding_for_comment(
-                rule, message, help, path, src, comment, start, end,
+            findings.push(finding_for_body(
+                &lint,
+                comment.body_start_byte,
+                start,
+                end,
             ));
         }
     }
-    for surface in strings {
+    for surface in input.strings {
         if language_escape(&surface.body) {
             continue;
         }
         if let Some((start, end)) = matcher(&surface.body) {
-            findings.push(finding_for_surface(
-                rule, message, help, path, src, surface, start, end,
+            findings.push(finding_for_body(
+                &lint,
+                surface.body_start_byte,
+                start,
+                end,
             ));
         }
     }
     findings
 }
 
-fn finding_for_comment(
-    rule: &str,
-    message: &str,
-    help: &str,
-    path: &Path,
-    src: &str,
-    comment: &Comment,
+fn finding_for_body(
+    lint: &LanguageLint,
+    body_start_byte: usize,
     body_start: usize,
     body_end: usize,
 ) -> Finding {
-    let abs_start = comment.body_start_byte + body_start;
-    let abs_end = comment.body_start_byte + body_end;
-    finding_for_range(rule, message, help, path, src, abs_start, abs_end)
-}
-
-fn finding_for_surface(
-    rule: &str,
-    message: &str,
-    help: &str,
-    path: &Path,
-    src: &str,
-    surface: &TextSurface,
-    body_start: usize,
-    body_end: usize,
-) -> Finding {
-    let abs_start = surface.body_start_byte + body_start;
-    let abs_end = surface.body_start_byte + body_end;
-    finding_for_range(rule, message, help, path, src, abs_start, abs_end)
-}
-
-fn finding_for_range(
-    rule: &str,
-    message: &str,
-    help: &str,
-    path: &Path,
-    src: &str,
-    start_byte: usize,
-    end_byte: usize,
-) -> Finding {
-    let (line, col) = pos_at_offset(src, start_byte);
-    let (end_line, end_col) = pos_at_offset(src, end_byte);
+    let start_byte = body_start_byte + body_start;
+    let end_byte = body_start_byte + body_end;
+    let (line, col) = pos_at_offset(lint.src, start_byte);
+    let (end_line, end_col) = pos_at_offset(lint.src, end_byte);
     Finding {
-        rule: rule.to_string(),
-        message: message.to_string(),
-        help: help.to_string(),
-        file: path.display().to_string(),
+        rule: lint.rule.to_string(),
+        message: lint.message.to_string(),
+        help: lint.help.to_string(),
+        file: lint.path.display().to_string(),
         line,
         column: col,
         end_line,
@@ -279,7 +277,10 @@ fn elision_match(body: &str) -> Option<(usize, usize)> {
 
 fn fence_match(body: &str) -> bool {
     let trimmed = body.trim();
-    trimmed.starts_with("```") && trimmed[3..].chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    trimmed.starts_with("```")
+        && trimmed[3..]
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 fn is_section_divider(body: &str) -> bool {

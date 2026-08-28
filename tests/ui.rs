@@ -152,8 +152,7 @@ fn f() {
         lint_strings: true,
         ..Config::default()
     };
-    let findings =
-        anti_slop::lint_source(src, std::path::Path::new("t.rs"), &config).unwrap();
+    let findings = anti_slop::lint_source(src, std::path::Path::new("t.rs"), &config).unwrap();
     assert!(
         findings.iter().any(|f| f.rule == "no_chat_preamble"),
         "{findings:#?}"

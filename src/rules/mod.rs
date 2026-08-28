@@ -1,3 +1,4 @@
+mod language;
 mod no_ad_hoc_env;
 mod no_any_bag;
 mod no_automock;
@@ -17,7 +18,6 @@ mod no_typeid_branch;
 mod no_untyped_map;
 mod no_value_soup;
 mod no_widen_then_narrow;
-mod language;
 
 use std::path::Path;
 

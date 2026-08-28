@@ -142,12 +142,7 @@ pub(crate) fn lint_source(src: &str, path: &Path, config: &Config) -> anyhow::Re
             continue;
         }
         findings.extend(rules::lint_rule(
-            rule,
-            &file,
-            src,
-            path,
-            &comments,
-            &strings,
+            rule, &file, src, path, &comments, &strings,
         ));
     }
     findings.retain(|f| {
@@ -520,7 +515,8 @@ pub(crate) fn scan_string_literals(src: &str) -> Vec<TextSurface> {
             }
             continue;
         }
-        if bytes[i] == b'/' && i + 1 < bytes.len() && (bytes[i + 1] == b'/' || bytes[i + 1] == b'*') {
+        if bytes[i] == b'/' && i + 1 < bytes.len() && (bytes[i + 1] == b'/' || bytes[i + 1] == b'*')
+        {
             if bytes[i + 1] == b'/' {
                 bump(&mut i, &mut line, &mut col);
                 bump(&mut i, &mut line, &mut col);
