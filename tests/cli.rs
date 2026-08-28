@@ -77,7 +77,10 @@ fn json_format() {
     assert_eq!(out.status.code(), Some(1));
     let stdout = String::from_utf8_lossy(&out.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect(&stdout);
-    let first = &parsed.as_array().expect("array")[0];
+    let first = parsed
+        .as_array()
+        .and_then(|a| a.first())
+        .expect("array with one finding");
     assert!(first.get("rule").is_some());
     assert!(first.get("end_line").is_some());
     assert!(first.get("end_column").is_some());
