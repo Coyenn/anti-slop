@@ -51,10 +51,7 @@ pub fn lint_emdash(
             src,
             path,
         },
-        ScanInput {
-            comments,
-            strings,
-        },
+        ScanInput { comments, strings },
         emdash_match,
     )
 }
@@ -73,10 +70,7 @@ pub fn lint_smart_quotes(
             src,
             path,
         },
-        ScanInput {
-            comments,
-            strings,
-        },
+        ScanInput { comments, strings },
         smart_quote_match,
     )
 }
@@ -95,10 +89,7 @@ pub fn lint_chat_preamble(
             src,
             path,
         },
-        ScanInput {
-            comments,
-            strings,
-        },
+        ScanInput { comments, strings },
         chat_preamble_match,
     )
 }
@@ -117,10 +108,7 @@ pub fn lint_elision_comment(
             src,
             path,
         },
-        ScanInput {
-            comments,
-            strings,
-        },
+        ScanInput { comments, strings },
         elision_match,
     )
 }
@@ -175,12 +163,7 @@ fn lint_surfaces(lint: LanguageLint, input: ScanInput, matcher: SurfaceMatch) ->
             continue;
         }
         if let Some((start, end)) = matcher(&comment.body) {
-            findings.push(finding_for_body(
-                &lint,
-                comment.body_start_byte,
-                start,
-                end,
-            ));
+            findings.push(finding_for_body(&lint, comment.body_start_byte, start, end));
         }
     }
     for surface in input.strings {
@@ -188,12 +171,7 @@ fn lint_surfaces(lint: LanguageLint, input: ScanInput, matcher: SurfaceMatch) ->
             continue;
         }
         if let Some((start, end)) = matcher(&surface.body) {
-            findings.push(finding_for_body(
-                &lint,
-                surface.body_start_byte,
-                start,
-                end,
-            ));
+            findings.push(finding_for_body(&lint, surface.body_start_byte, start, end));
         }
     }
     findings
